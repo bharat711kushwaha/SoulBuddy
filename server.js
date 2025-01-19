@@ -2,6 +2,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const fs = require("fs");
+const path = require("path");
+const convertPngToPdf = require('./KundliGenerator/index.js')
+const { spawn } = require('child_process');
+const User = require('./models/userSchema');
+// const authMiddleware = require('../middleware/authMiddleware');
 
 // Import Langflow Client and Routes
 const { LangflowClient } = require('./langflowClient.js');
@@ -9,6 +15,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const horoscopeRoutes = require('./routes/horoscopeRoutes'); // Correct import path
 const { errorHandler } = require('./utils/errorHandler');
+const { date } = require('joi');
 
 // Load environment variables
 dotenv.config();
@@ -82,6 +89,81 @@ app.post('/api/v1/runFlow', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes); // Correct path for user-related routes
 app.use('/api/users', horoscopeRoutes); // Correct path for horoscope routes
+
+app.get('/api/createKundli', async (req, res) => {
+  const {id}  = req.headers;
+  await convertPngToPdf(id);
+  const filePath = path.join(__dirname, `./${id}.pdf`); // Path to the PDF file
+  const fileName = "kundli.pdf"; // Name to send as a download
+  
+  // Ensure the file exists
+  if (fs.existsSync(filePath)) {
+    res.setHeader("Content-Type", "application/pdf"); // Set content type
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${fileName}"`
+    ); // Optional: Make it a download
+    fs.createReadStream(filePath).pipe(res); // Stream the PDF to the response
+  } else {
+    res.status(404).send("File not found");
+  }
+}); 
+
+const getFormattedDate = () => {
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, '0'); // Add leading zero if needed
+  const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are zero-indexed
+  const year = String(today.getFullYear()).slice(-2); // Get the last two digits of the year
+
+  return `${year} ${month} ${day}`;
+};
+
+app.get('/api/getUserHoroscope', async (req, res) => {
+  const { id } = req.headers;
+  if (!id) {
+      return res.status(400).json({ success: false, message: 'User ID is required in headers' });
+  }
+
+  try {
+      // Fetch user details from the database
+      const user = await User.findById({ _id: id });
+      if (!user) {
+          return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const sign = user.zodiacSign;
+      const date = getFormattedDate(); // Ensure this function is defined and works
+
+      // Spawn the Python process
+      const pythonProcess = spawn('python', ['./pythonScripts/scrapeDailyHorroscope.py', sign, date]);
+
+      let output = '';
+      let error = '';
+
+      // Collect stdout data
+      pythonProcess.stdout.on('data', (data) => {
+          output += data.toString();
+      });
+
+      // Collect stderr data
+      pythonProcess.stderr.on('data', (data) => {
+          error += data.toString();
+      });
+
+      // Handle process close and send the response
+      pythonProcess.on('close', (code) => {
+          if (code === 0) {
+              return res.json({ success: true, message: output.trim() });
+          } else {
+              console.error(`Python script exited with code ${code}: ${error}`);
+              return res.status(500).json({ success: false, message: 'Error executing Python script', error });
+          }
+      });
+  } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+  }
+});
 
 // Error handling middleware (should be last middleware)
 app.use(errorHandler);
