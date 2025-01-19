@@ -38,10 +38,10 @@ mongoose
   });
 
 // Langflow Client setup
-const flowIdOrName = process.env.FLOW_ID;
-const langflowId = process.env.LANGFLOW_ID;
-const applicationToken = process.env.LANGFLOW_APPLICATION_TOKEN;
-const langflowClient = new LangflowClient(process.env.LANGFLOW_BASE_URL, applicationToken);
+// const flowIdOrName = process.env.FLOW_ID;
+// const langflowId = process.env.LANGFLOW_ID;
+// const applicationToken = process.env.LANGFLOW_APPLICATION_TOKEN;
+// const langflowClient = new LangflowClient(process.env.LANGFLOW_BASE_URL, applicationToken);
 
 // Health check endpoint
 app.get('/api/home', (req, res) => {
@@ -52,38 +52,78 @@ app.get('/api/home', (req, res) => {
 });
 
 // Langflow endpoint to run the flow
-app.post('/api/v1/runFlow', async (req, res) => {
+// app.post('/api/v1/runFlow', async (req, res) => {
+//   const { inputValue, inputType = 'chat', outputType = 'chat', stream = false, tweaks = {} } = req.body;
+
+//   try {
+//     const response = await langflowClient.runFlow(
+//       flowIdOrName,
+//       langflowId,
+//       inputValue,
+//       inputType,
+//       outputType,
+//       tweaks,
+//       stream,
+//       (data) => console.log('Received:', data.chunk), // onUpdate
+//       (message) => console.log('Stream Closed:', message), // onClose
+//       (error) => console.error('Stream Error:', error) // onError
+//     );
+
+//     // Handle non-streamed responses
+//     if (!stream && response && response.outputs) {
+//       const flowOutputs = response.outputs[0];
+//       const firstComponentOutputs = flowOutputs.outputs[0];
+//       const output = firstComponentOutputs.outputs.message;
+
+//       console.log("Final Output:", output.message.text);
+//   }
+// } catch (error) {
+//   console.error('Main Error', error.message);
+// }
+// });
+
+app.post('/api/v1/runFlow', async (req, res) =>  {
+  // console.log("hi");
   const { inputValue, inputType = 'chat', outputType = 'chat', stream = false, tweaks = {} } = req.body;
+  // console.log(inputValue);
+  const flowIdOrName = process.env.FLOW_ID;
+  const langflowId = process.env.LANGFLOW_ID;
+  const applicationToken = process.env.LANGFLOW_APPLICATION_TOKEN;
+  const langflowClient = new LangflowClient(`${process.env.LANGFLOW_BASE_URL}`,
+      applicationToken);
 
   try {
-    const response = await langflowClient.runFlow(
-      flowIdOrName,
-      langflowId,
-      inputValue,
-      inputType,
-      outputType,
-      tweaks,
-      stream,
-      (data) => console.log('Received:', data.chunk), // onUpdate
-      (message) => console.log('Stream Closed:', message), // onClose
-      (error) => console.error('Stream Error:', error) // onError
+    const tweaks = {
+"ChatInput-Cp7r0": {},
+"ChatOutput-e4Zdh": {},
+"Memory-YGlYK": {},
+"Prompt-o8hZT": {},
+"GroqModel-rSr0g": {}
+};
+    response = await langflowClient.runFlow(
+        flowIdOrName,
+        langflowId,
+        inputValue,
+        inputType,
+        outputType,
+        tweaks,
+        stream,
+        (data) => console.log("Received:", data.chunk), // onUpdate
+        (message) => console.log("Stream Closed:", message), // onClose
+        (error) => console.log("Stream Error:", error) // onError
     );
-
-    // Handle non-streamed responses
-    if (!stream && response?.outputs?.[0]?.outputs?.[0]?.outputs?.message?.text) {
-      const output = response.outputs[0].outputs[0].outputs.message.text;
-      res.status(200).json({ message: output });
-    } else if (!stream) {
-      res.status(500).json({ error: 'Unexpected response structure from Langflow' });
-    } else {
-      // Stream responses will already be handled
-      res.status(200).json(response);
-    }
-  } catch (error) {
-    console.error('Error while running Langflow:', error.message);
-    res.status(500).json({ error: 'Failed to process the Langflow request' });
+    // console.log(response);
+    if (!stream && response && response.outputs) {
+        const flowOutputs = response.outputs[0];
+        const firstComponentOutputs = flowOutputs.outputs[0];
+        const output = firstComponentOutputs.outputs.message;
+        res.status(200).json({Final_Output : output.message.text})
+      }
+    } catch (error) {
+      res.status(200).json({Main_error : error.message})
   }
-});
+})
+
 
 // Authentication and User Routes
 app.use('/api/auth', authRoutes);
