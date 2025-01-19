@@ -64,21 +64,22 @@ app.post('/api/v1/runFlow', async (req, res) => {
       outputType,
       tweaks,
       stream,
-      (data) => console.log('Received:', data.chunk), // onUpdate
-      (message) => console.log('Stream Closed:', message), // onClose
-      (error) => console.error('Stream Error:', error) // onError
+      // (data) => console.log('Received:', data.chunk), // onUpdate
+      // (message) => console.log('Stream Closed:', message), // onClose
+      // (error) => console.error('Stream Error:', error) // onError
     );
-
+    console.log(response);
+    console.log(response.outputs[0].outputs.artifacts)
     // Handle non-streamed responses
-    if (!stream && response?.outputs?.[0]?.outputs?.[0]?.outputs?.message?.text) {
-      const output = response.outputs[0].outputs[0].outputs.message.text;
-      res.status(200).json({ message: output });
-    } else if (!stream) {
-      res.status(500).json({ error: 'Unexpected response structure from Langflow' });
-    } else {
-      // Stream responses will already be handled
-      res.status(200).json(response);
-    }
+    // if (!stream && response?.outputs?.[0]?.outputs?.[0]?.outputs?.message) {
+    //   const output = response.outputs[0].outputs[0].outputs.artifacts.message;
+    //   res.status(200).send(output); // Send only the text as a string
+    // } else if (!stream) {
+    //   res.status(500).json({ error: 'Unexpected response structure from Langflow' });
+    // } else {
+    //   // Stream responses will already be handled by the stream mechanism
+    //   res.status(200).json(response); // You may want to refine how stream responses are handled here if needed
+    // }
   } catch (error) {
     console.error('Error while running Langflow:', error.message);
     res.status(500).json({ error: 'Failed to process the Langflow request' });
