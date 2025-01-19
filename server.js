@@ -92,78 +92,88 @@ app.use('/api/users', horoscopeRoutes); // Correct path for horoscope routes
 
 app.get('/api/createKundli', async (req, res) => {
   const {id}  = req.headers;
-  await convertPngToPdf(id);
-  const filePath = path.join(__dirname, `./${id}.pdf`); // Path to the PDF file
-  const fileName = "kundli.pdf"; // Name to send as a download
+  const data = await convertPngToPdf(id);
+  // const filePath = path.join(__dirname, `./${id}.pdf`); // Path to the PDF file
+  // const fileName = "kundli.pdf"; // Name to send as a download
   
   // Ensure the file exists
-  if (fs.existsSync(filePath)) {
-    res.setHeader("Content-Type", "application/pdf"); // Set content type
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${fileName}"`
-    ); // Optional: Make it a download
-    fs.createReadStream(filePath).pipe(res); // Stream the PDF to the response
-  } else {
-    res.status(404).send("File not found");
-  }
+  // if (fs.existsSync(filePath)) {
+  //   res.setHeader("Content-Type", "application/pdf"); // Set content type
+  //   res.setHeader(
+  //     "Content-Disposition",
+  //     `attachment; filename="${fileName}"`
+  //   ); // Optional: Make it a download
+  //   fs.createReadStream(filePath).pipe(res); // Stream the PDF to the response
+  // } else {
+  //   res.status(404).send("File not found");
+  // }
+    res.status(200).json(data);
+  
 }); 
 
+const getFormattedDate2 = () => {
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, '0'); // Add leading zero if needed
+  const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are zero-indexed
+  const year = String(today.getFullYear()).slice(-2); // Get the last two digits of the year
+
+  return `20${year}-${month}-${day} `;
+};
 const getFormattedDate = () => {
   const today = new Date();
   const day = String(today.getDate()).padStart(2, '0'); // Add leading zero if needed
   const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are zero-indexed
   const year = String(today.getFullYear()).slice(-2); // Get the last two digits of the year
 
-  return `${year} ${month} ${day}`;
+  return `${day}-${month}-${year}`;
 };
 
-app.get('/api/getUserHoroscope', async (req, res) => {
-  const { id } = req.headers;
-  if (!id) {
-      return res.status(400).json({ success: false, message: 'User ID is required in headers' });
-  }
+app.get('/api/getUserHorroscope', async (req, res) => {
+  const {id}  = req.headers;
+  let response;
+    try {
+      response = await User.findById({_id: id})
+    } catch(error){
+      console.log(error);
+      return res.statusCode(500).json({success: false, message: error});
+    }
+    const sign = response.zodiacSign;
+    const date = getFormattedDate2();
 
-  try {
-      // Fetch user details from the database
-      const user = await User.findById({ _id: id });
-      if (!user) {
-          return res.status(404).json({ success: false, message: 'User not found' });
-      }
+  const pythonProcess = spawn('python',["./pythonScripts/scrapeDailyHorroscope.py", sign, date]);
+  pythonProcess.stdout.on('data', (data) => {
+    return res.json({success: true, message: data.toString()});
+  });
+  pythonProcess.stderr.on('data', (data) => {
+    return res.json({success: false, message: data.toString()});
+  });
+}); 
 
-      const sign = user.zodiacSign;
-      const date = getFormattedDate(); // Ensure this function is defined and works
+app.get('/api/getReels', async (req, res) => {
+  const {id}  = req.headers;
+  // console.log(id);
+  let response;
+    try {
+      response = await User.findById({_id: id})
+    } catch(error){
+      console.log(error);
+      return res.statusCode(500).json({success: false, message: error});
+    }
 
-      // Spawn the Python process
-      const pythonProcess = spawn('python', ['./pythonScripts/scrapeDailyHorroscope.py', sign, date]);
+    const zodiac_sign = response.zodiacSign;
+    console.log(zodiac_sign);
+    const today_date = getFormattedDate();
+    const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+    const query = `aaj ka rashifal ${zodiac_sign} ${today_date} in shorts`
 
-      let output = '';
-      let error = '';
-
-      // Collect stdout data
-      pythonProcess.stdout.on('data', (data) => {
-          output += data.toString();
-      });
-
-      // Collect stderr data
-      pythonProcess.stderr.on('data', (data) => {
-          error += data.toString();
-      });
-
-      // Handle process close and send the response
-      pythonProcess.on('close', (code) => {
-          if (code === 0) {
-              return res.json({ success: true, message: output.trim() });
-          } else {
-              console.error(`Python script exited with code ${code}: ${error}`);
-              return res.status(500).json({ success: false, message: 'Error executing Python script', error });
-          }
-      });
-  } catch (error) {
-      console.error(error);
-      return res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
-  }
-});
+  const pythonProcess = spawn('python',["./pythonScripts/scrapeReels.py", query, YOUTUBE_API_KEY]);
+  pythonProcess.stdout.on('data', (data) => {
+    return res.json({success: true, message: data.toString()});
+  });
+  pythonProcess.stderr.on('data', (data) => {
+    return res.json({success: false, message: data.toString()});
+  });
+}); 
 
 // Error handling middleware (should be last middleware)
 app.use(errorHandler);

@@ -58,12 +58,12 @@ class LangflowClient {
   async runFlow(flowIdOrName, langflowId, inputValue, inputType = 'chat', outputType = 'chat', tweaks = {}, stream = false, onUpdate, onClose, onError) {
     try {
       const initResponse = await this.initiateSession(flowIdOrName, langflowId, inputValue, inputType, outputType, stream, tweaks);
-      console.log('Init Response:', initResponse);
-      if (stream && initResponse && initResponse.outputs && initResponse.outputs[0].outputs[0].artifacts.stream_url) {
-        const streamUrl = initResponse.outputs[0].outputs[0].artifacts.stream_url;
-        console.log(`Streaming from: ${streamUrl}`);
-        this.handleStream(streamUrl, onUpdate, onClose, onError);
-      }
+      
+      // if (stream && initResponse && initResponse.outputs && initResponse.outputs[0].outputs[0].artifacts.stream_url) {
+      //   const streamUrl = initResponse.outputs[0].outputs[0].artifacts.stream_url;
+      //   console.log(`Streaming from: ${streamUrl}`);
+      //   this.handleStream(streamUrl, onUpdate, onClose, onError);
+      // }
       return initResponse;
     } catch (error) {
       console.error('Error running flow:', error);
